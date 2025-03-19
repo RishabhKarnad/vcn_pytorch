@@ -1,0 +1,5 @@
+#! /bin/bash
+
+export CUDA_VISIBLE_DEVICES=14
+
+python main.py --num_nodes 7 --data_seed 42 --anneal --save_path ./results
