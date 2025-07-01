@@ -28,6 +28,8 @@ def parse_args():
                         help='random seed (default: 10)')
     parser.add_argument('--data_seed', type=int, default=20,
                         help='random seed for generating data(default: 20)')
+    parser.add_argument('--dataset_dir', type=str, default='./',
+                        help='Directory of custom data; requires data.npy file')
     parser.add_argument('--batch_size', type=int, default=1000,
                         help='Batch Size for training')
     parser.add_argument('--lr', type=float, default=1e-2,
@@ -128,7 +130,7 @@ def exp_shd(model, ground_truth, num_samples=1000):
             shd += metrics['shd']
             prc += metrics['prc']
             rec += metrics['rec']
-    return shd/num_samples, prc/num_samples, rec/num_samples
+    return shd/num_samples, prc/num_samples, rec/num_samples, G
 
 
 def full_kl_and_hellinger(model, bge_train, g_dist, device):
@@ -227,9 +229,8 @@ def load_data(args):
         train_data = data_map[args.data_type](num_nodes=args.num_nodes, exp_edges=args.exp_edges, noise_type=args.noise_type, noise_sigma=args.noise_sigma,
                                               num_samples=args.num_samples, mu_prior=args.theta_mu, sigma_prior=args.theta_sigma, seed=args.data_seed)
 
-    train_data.samples = torch.tensor(np.load('./datasets/7var/data.npy'))
-    train_data.adjacency_matrix = torch.tensor(
-        np.load('./datasets/7var/G.npy'))
+    train_data.samples = torch.tensor(np.load(f'{args.dataset_dir}/data.npy'))
+    train_data.adjacency_matrix = np.load(f'{args.dataset_dir}/G.npy')
 
     bge_train = bge_model.BGe(mean_obs=[args.theta_mu]*args.num_nodes, alpha_mu=1.0,
                               alpha_lambd=args.alpha_lambd, data=train_data.samples, device=args.device)
@@ -287,7 +288,8 @@ def main(args):
 
     model.load_state_dict(torch.load(
         osp.join(args.save_path, 'best_model.pth'))['model'])
-    shd, prc, rec = exp_shd(model, train_data.adjacency_matrix)
+    shd, prc, rec, samples = exp_shd(model, train_data.adjacency_matrix)
+    np.save(f'{args.save_path}/posterior.npy', samples.to(device='cpu'))
     kl_full = 0.
     hellinger_full = 0.
     auroc_score = 0.
